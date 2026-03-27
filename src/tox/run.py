@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 from tox.config.cli.parse import get_options
 from tox.report import HandledError, ToxHandler
 from tox.session.state import State
+from tox.util.profile import profile_block
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -20,7 +21,8 @@ if TYPE_CHECKING:
 def run(args: Sequence[str] | None = None) -> None:
     try:
         with ToxHandler.patch_thread():
-            result = main(sys.argv[1:] if args is None else args)
+            with profile_block("run.main_wrapper"):
+                result = main(sys.argv[1:] if args is None else args)
     except Exception as exception:
         if isinstance(exception, HandledError):
             logging.error("%s| %s", type(exception).__name__, exception)  # noqa: TRY400
@@ -39,23 +41,28 @@ def run(args: Sequence[str] | None = None) -> None:
 
 
 def main(args: Sequence[str]) -> int:
-    state = setup_state(args)
+    with profile_block("run.setup_state", argc=len(args)):
+        state = setup_state(args)
     from tox.provision import provision  # noqa: PLC0415
 
-    result = provision(state)
+    with profile_block("run.provision"):
+        result = provision(state)
     if result is not False:
         return result
     handler = state._options.cmd_handlers[state.conf.options.command]  # noqa: SLF001
-    return handler(state)
+    with profile_block("run.command", command=state.conf.options.command):
+        return handler(state)
 
 
 def setup_state(args: Sequence[str]) -> State:
     """Setup the state object of this run."""
     start = time.monotonic()
     # parse CLI arguments
-    options = get_options(*args)
+    with profile_block("run.get_options", argc=len(args)):
+        options = get_options(*args)
     options.parsed.start = start
     if options.parsed.exit_and_dump_after:
         faulthandler.dump_traceback_later(timeout=options.parsed.exit_and_dump_after, exit=True)  # pragma: no cover
     # build tox environment config objects
-    return State(options, args)
+    with profile_block("run.state_init"):
+        return State(options, args)

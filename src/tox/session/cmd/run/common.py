@@ -21,6 +21,7 @@ from colorama import Fore
 from tox.execute import Outcome
 from tox.journal import write_journal
 from tox.session.cmd.run.single import ToxEnvRunResult, run_one
+from tox.util.profile import profile_block
 from tox.util.graph import stable_topological_sort
 from tox.util.spinner import MISS_DURATION, Spinner
 
@@ -214,10 +215,11 @@ def execute(state: State, max_workers: int | None, has_spinner: bool, live: bool
     interrupt, done = Event(), Event()
     results: list[ToxEnvRunResult] = []
     future_to_env: dict[Future[ToxEnvRunResult], ToxEnv] = {}
-    state.envs.ensure_only_run_env_is_active()
-    to_run_list: list[str] = list(state.envs.iter())
-    for name in to_run_list:
-        cast("RunToxEnv", state.envs[name]).mark_active()
+    with profile_block("run.execute.prepare"):
+        state.envs.ensure_only_run_env_is_active()
+        to_run_list: list[str] = list(state.envs.iter())
+        for name in to_run_list:
+            cast("RunToxEnv", state.envs[name]).mark_active()
     previous, has_previous = None, False
     try:
         spinner = ToxSpinner(has_spinner, state, len(to_run_list))
@@ -226,23 +228,24 @@ def execute(state: State, max_workers: int | None, has_spinner: bool, live: bool
             name="tox-interrupt",
             args=(state, to_run_list, results, future_to_env, interrupt, done, max_workers, spinner, live),
         )
-        thread.start()
-        try:
-            while thread.is_alive():
-                thread.join(timeout=1)
-        except KeyboardInterrupt:
-            previous, has_previous = signal(SIGINT, Handlers.SIG_IGN), True
-            spinner.print_report = False  # no need to print reports at this point, final report coming up
-            logger.error("[%s] KeyboardInterrupt - teardown started", os.getpid())  # noqa: TRY400
-            interrupt.set()
-            # cancel in reverse order to not allow submitting new jobs as we cancel running ones
-            for future, tox_env in reversed(list(future_to_env.items())):
-                canceled = future.cancel()
-                # if cannot be canceled and not done -> still runs
-                if canceled is False and not future.done():  # pragma: no branch
-                    tox_env.interrupt()
-            done.wait()
-            thread.join()
+        with profile_block("run.execute.queue_wait", total=len(to_run_list), max_workers=max_workers):
+            thread.start()
+            try:
+                while thread.is_alive():
+                    thread.join(timeout=1)
+            except KeyboardInterrupt:
+                previous, has_previous = signal(SIGINT, Handlers.SIG_IGN), True
+                spinner.print_report = False  # no need to print reports at this point, final report coming up
+                logger.error("[%s] KeyboardInterrupt - teardown started", os.getpid())  # noqa: TRY400
+                interrupt.set()
+                # cancel in reverse order to not allow submitting new jobs as we cancel running ones
+                for future, tox_env in reversed(list(future_to_env.items())):
+                    canceled = future.cancel()
+                    # if cannot be canceled and not done -> still runs
+                    if canceled is False and not future.done():  # pragma: no branch
+                        tox_env.interrupt()
+                done.wait()
+                thread.join()
     finally:
         name_to_run = {r.name: r for r in results}
         ordered_results: list[ToxEnvRunResult] = []
@@ -462,5 +465,6 @@ def run_order(state: State, to_run: list[str]) -> tuple[list[str], dict[str, set
         run_env = cast("RunToxEnv", state.envs[env])
         depends = set(cast("EnvList", run_env.conf["depends"]).envs)
         todo[env] = {name for dep in depends for name in to_run_set if fnmatchcase(name, dep)} - {env}
-    order = stable_topological_sort(todo)
+    with profile_block("run.execute.topological_sort", total=len(todo)):
+        order = stable_topological_sort(todo)
     return order, todo

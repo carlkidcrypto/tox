@@ -185,6 +185,25 @@ def test_plugin_can_read_sections(tox_project: ToxProjectCreator, mocker: Mocker
     assert "ROOT: Sections: tox, testenv, testenv:section, other:section" in result.out
 
 
+def test_plugin_load_external_plugins_default(mocker: MockerFixture) -> None:
+    plugin = Plugin()
+    load_setuptools_entrypoints = mocker.patch.object(plugin.manager, "load_setuptools_entrypoints")
+
+    plugin._load_external_plugins()  # noqa: SLF001
+
+    load_setuptools_entrypoints.assert_called_once()
+
+
+def test_plugin_load_external_plugins_can_be_skipped(mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+    plugin = Plugin()
+    load_setuptools_entrypoints = mocker.patch.object(plugin.manager, "load_setuptools_entrypoints")
+    monkeypatch.setenv("TOX_SKIP_EXTERNAL_PLUGINS", "1")
+
+    plugin._load_external_plugins()  # noqa: SLF001
+
+    load_setuptools_entrypoints.assert_not_called()
+
+
 def test_plugin_injects_invalid_python_run(tox_project: ToxProjectCreator, mocker: MockerFixture) -> None:
     @impl
     def tox_add_env_config(env_conf: EnvConfigSet, state: State) -> None:  # noqa: ARG001

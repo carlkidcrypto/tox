@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="430" viewBox="0 0 900 430" role="img" aria-labelledby="title desc">
+  <title id="title">ezsnmp tox startup elapsed time in WSL</title>
+  <desc id="desc">Bar chart comparing baseline versus fixed elapsed milliseconds for three samples.</desc>
+  <style>
+    text { font-family: "DejaVu Sans", "Noto Sans", sans-serif; fill: #17202a; }
+    .axis { stroke: #5d6d7e; stroke-width: 1; }
+    .grid { stroke: #d5d8dc; stroke-width: 1; }
+    .baseline { fill: #2e86c1; }
+    .fixed { fill: #27ae60; }
+    .label { font-size: 13px; }
+    .title { font-size: 20px; font-weight: 700; }
+    .subtitle { font-size: 13px; fill: #566573; }
+    .value { font-size: 12px; font-weight: 600; }
+  </style>
+
+  <rect x="0" y="0" width="900" height="430" fill="#f8f9f9"/>
+
+  <text class="title" x="30" y="35">WSL ezsnmp tox -av elapsed time</text>
+  <text class="subtitle" x="30" y="58">Lower is better. Sample 2 baseline is a known outlier from host load.</text>
+
+  <line class="axis" x1="90" y1="90" x2="90" y2="360"/>
+  <line class="axis" x1="90" y1="360" x2="860" y2="360"/>
+
+  <line class="grid" x1="90" y1="300" x2="860" y2="300"/>
+  <line class="grid" x1="90" y1="240" x2="860" y2="240"/>
+  <line class="grid" x1="90" y1="180" x2="860" y2="180"/>
+  <line class="grid" x1="90" y1="120" x2="860" y2="120"/>
+
+  <text class="label" x="36" y="363">0</text>
+  <text class="label" x="20" y="303">500</text>
+  <text class="label" x="12" y="243">1000</text>
+  <text class="label" x="12" y="183">1500</text>
+  <text class="label" x="12" y="123">2000</text>
+
+  <rect class="baseline" x="160" y="288.96" width="65" height="71.04"/>
+  <rect class="fixed" x="235" y="329.64" width="65" height="30.36"/>
+  <text class="value" x="168" y="282">592</text>
+  <text class="value" x="245" y="323">253</text>
+
+  <rect class="baseline" x="390" y="107.52" width="65" height="252.48"/>
+  <rect class="fixed" x="465" y="327.84" width="65" height="32.16"/>
+  <text class="value" x="394" y="101">2104</text>
+  <text class="value" x="476" y="321">268</text>
+
+  <rect class="baseline" x="620" y="333.72" width="65" height="26.28"/>
+  <rect class="fixed" x="695" y="328.92" width="65" height="31.08"/>
+  <text class="value" x="632" y="327">219</text>
+  <text class="value" x="706" y="322">259</text>
+
+  <text class="label" x="195" y="385">Sample 1</text>
+  <text class="label" x="425" y="385">Sample 2</text>
+  <text class="label" x="655" y="385">Sample 3</text>
+
+  <rect class="baseline" x="650" y="24" width="20" height="12"/>
+  <text class="label" x="678" y="34">baseline</text>
+  <rect class="fixed" x="760" y="24" width="20" height="12"/>
+  <text class="label" x="788" y="34">fixed</text>
+</svg>

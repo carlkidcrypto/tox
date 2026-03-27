@@ -21,6 +21,7 @@ from tox.tox_env.errors import RunnerUnavailable, Skip
 from tox.tox_env.package import PackageToxEnv
 from tox.tox_env.register import REGISTER
 from tox.tox_env.runner import RunToxEnv
+from tox.util.profile import profile_block
 
 if TYPE_CHECKING:
     import sys
@@ -376,65 +377,66 @@ class EnvSelector:
             self._defined_envs_ = {}
             failed: dict[str, Exception] = {}
             env_name_to_active = self._env_name_to_active()
-            for name, is_active in env_name_to_active.items():
-                if name in self._pkg_env_counter:  # already marked as packaging, nothing to do here
-                    continue
-                with self._log_handler.with_context(name):
-                    try:
-                        run_env = self._build_run_env(name)
-                        if run_env is None:
-                            continue
-                        self._defined_envs_[name] = _ToxEnvInfo(run_env, is_active)
-                        pkg_name_type = run_env.get_package_env_types()
-                    except RunnerUnavailable as exc:
-                        LOGGER.warning(
-                            "environment %s marked as unavailable, runner %r is not available",
-                            name,
-                            str(exc),
-                        )
-                        self._unavailable_envs[name] = str(exc)
-                        self._defined_envs_[name] = _ToxEnvInfo(
-                            env=None, is_active=is_active, runner_unavailable=str(exc)
-                        )
+            with profile_block("env_select.define", total=len(env_name_to_active)):
+                for name, is_active in env_name_to_active.items():
+                    if name in self._pkg_env_counter:  # already marked as packaging, nothing to do here
                         continue
-                if pkg_name_type is not None:
-                    # build package env and assign it, then register the run environment which can trigger generation
-                    # of additional run environments
-                    start_package_env_use_counter = self._pkg_env_counter.copy()
-                    try:
-                        run_env.package_env = self._build_pkg_env(pkg_name_type, name, env_name_to_active)
-                    except Exception as exception:  # noqa: BLE001
-                        # if it's not a run environment, wait to see if ends up being a packaging one -> rollback
-                        failed[name] = exception
-                        for key in self._pkg_env_counter - start_package_env_use_counter:
-                            del self._defined_envs_[key]
-                            self._state.conf.clear_env(key)
-                        self._pkg_env_counter = start_package_env_use_counter
-                        del self._defined_envs_[name]
-                        self._state.conf.clear_env(name)
-                    else:
+                    with self._log_handler.with_context(name):
                         try:
-                            for env in run_env.package_envs:
-                                # check if any packaging envs are already run and remove them
-                                other_env_info = self._defined_envs_.get(env.name)
-                                if other_env_info is not None and isinstance(other_env_info.env, RunToxEnv):
-                                    del self._defined_envs_[env.name]  # pragma: no cover
-                                    for pkg_env in other_env_info.env.package_envs:  # pragma: no cover
-                                        self._pkg_env_counter[pkg_env.name] -= 1  # pragma: no cover
-                        except Exception:  # noqa: BLE001
-                            assert self._defined_envs_[name].package_skip is not None  # noqa: S101
-            failed_to_create = failed.keys() - self._defined_envs_.keys()
-            if failed_to_create:
-                raise failed[next(iter(failed_to_create))]
-            for name, count in self._pkg_env_counter.items():
-                if not count:
-                    self._defined_envs_.pop(name)  # pragma: no cover
+                            run_env = self._build_run_env(name)
+                            if run_env is None:
+                                continue
+                            self._defined_envs_[name] = _ToxEnvInfo(run_env, is_active)
+                            pkg_name_type = run_env.get_package_env_types()
+                        except RunnerUnavailable as exc:
+                            LOGGER.warning(
+                                "environment %s marked as unavailable, runner %r is not available",
+                                name,
+                                str(exc),
+                            )
+                            self._unavailable_envs[name] = str(exc)
+                            self._defined_envs_[name] = _ToxEnvInfo(
+                                env=None, is_active=is_active, runner_unavailable=str(exc)
+                            )
+                            continue
+                    if pkg_name_type is not None:
+                        # build package env and assign it, then register the run environment which can trigger generation
+                        # of additional run environments
+                        start_package_env_use_counter = self._pkg_env_counter.copy()
+                        try:
+                            run_env.package_env = self._build_pkg_env(pkg_name_type, name, env_name_to_active)
+                        except Exception as exception:  # noqa: BLE001
+                            # if it's not a run environment, wait to see if ends up being a packaging one -> rollback
+                            failed[name] = exception
+                            for key in self._pkg_env_counter - start_package_env_use_counter:
+                                del self._defined_envs_[key]
+                                self._state.conf.clear_env(key)
+                            self._pkg_env_counter = start_package_env_use_counter
+                            del self._defined_envs_[name]
+                            self._state.conf.clear_env(name)
+                        else:
+                            try:
+                                for env in run_env.package_envs:
+                                    # check if any packaging envs are already run and remove them
+                                    other_env_info = self._defined_envs_.get(env.name)
+                                    if other_env_info is not None and isinstance(other_env_info.env, RunToxEnv):
+                                        del self._defined_envs_[env.name]  # pragma: no cover
+                                        for pkg_env in other_env_info.env.package_envs:  # pragma: no cover
+                                            self._pkg_env_counter[pkg_env.name] -= 1  # pragma: no cover
+                            except Exception:  # noqa: BLE001
+                                assert self._defined_envs_[name].package_skip is not None  # noqa: S101
+                failed_to_create = failed.keys() - self._defined_envs_.keys()
+                if failed_to_create:
+                    raise failed[next(iter(failed_to_create))]
+                for name, count in self._pkg_env_counter.items():
+                    if not count:
+                        self._defined_envs_.pop(name)  # pragma: no cover
 
-            # reorder to as defined rather as found
-            order = chain(env_name_to_active, (i for i in self._defined_envs_ if i not in env_name_to_active))
-            self._defined_envs_ = {name: self._defined_envs_[name] for name in order if name in self._defined_envs_}
-            self._finalize_config()
-            self._mark_active()
+                # reorder to as defined rather as found
+                order = chain(env_name_to_active, (i for i in self._defined_envs_ if i not in env_name_to_active))
+                self._defined_envs_ = {name: self._defined_envs_[name] for name in order if name in self._defined_envs_}
+                self._finalize_config()
+                self._mark_active()
         return self._defined_envs_
 
     def _finalize_config(self) -> None:
@@ -445,35 +447,42 @@ class EnvSelector:
         self._state.conf.core.mark_finalized()
 
     def _build_run_env(self, name: str) -> RunToxEnv | None:
-        if self._provision is not None and self._provision[0] is False and name == self._provision[1]:
-            # ignore provision env unless this is a provision run
-            return None
-        if self._provision is not None and self._provision[0] and name != self._provision[1]:
-            # ignore other envs when this is a provision run
-            return None
-        env_conf = self._state.conf.get_env(name, package=False)
-        desc = "the tox execute used to evaluate this environment"
-        env_conf.add_config(keys="runner", desc=desc, of_type=str, default=self._state.conf.options.default_runner)
-        runner_name = cast("str", env_conf["runner"])
-        try:
-            runner = REGISTER.runner(runner_name)
-        except KeyError as exc:
-            is_provision = self._provision is not None and name == self._provision[1]
-            is_explicitly_requested = (
-                self._cli_envs is not None and not self._cli_envs.is_all and name in self._cli_envs
+        with profile_block("env_select.build_run_env", env=name):
+            if self._provision is not None and self._provision[0] is False and name == self._provision[1]:
+                # ignore provision env unless this is a provision run
+                return None
+            if self._provision is not None and self._provision[0] and name != self._provision[1]:
+                # ignore other envs when this is a provision run
+                return None
+            env_conf = self._state.conf.get_env(name, package=False)
+            desc = "the tox execute used to evaluate this environment"
+            env_conf.add_config(keys="runner", desc=desc, of_type=str, default=self._state.conf.options.default_runner)
+            runner_name = cast("str", env_conf["runner"])
+            try:
+                runner = REGISTER.runner(runner_name)
+            except KeyError as exc:
+                is_provision = self._provision is not None and name == self._provision[1]
+                is_explicitly_requested = (
+                    self._cli_envs is not None and not self._cli_envs.is_all and name in self._cli_envs
+                )
+                if is_provision:
+                    raise
+                if is_explicitly_requested:
+                    msg = f"runner {runner_name!r} for environment {name!r} is not available (plugin may not be installed)"
+                    raise HandledError(msg) from exc
+                raise RunnerUnavailable(runner_name) from exc
+            journal = self._journal.get_env_journal(name)
+            args = ToxEnvCreateArgs(
+                env_conf,
+                self._state.conf.core,
+                self._state.conf.options,
+                journal,
+                self._log_handler,
             )
-            if is_provision:
-                raise
-            if is_explicitly_requested:
-                msg = f"runner {runner_name!r} for environment {name!r} is not available (plugin may not be installed)"
-                raise HandledError(msg) from exc
-            raise RunnerUnavailable(runner_name) from exc
-        journal = self._journal.get_env_journal(name)
-        args = ToxEnvCreateArgs(env_conf, self._state.conf.core, self._state.conf.options, journal, self._log_handler)
-        run_env = runner(args)
-        run_env.register_config()
-        self._manager.tox_add_env_config(env_conf, self._state)
-        return run_env
+            run_env = runner(args)
+            run_env.register_config()
+            self._manager.tox_add_env_config(env_conf, self._state)
+            return run_env
 
     def _build_pkg_env(self, name_type: tuple[str, str], run_env_name: str, active: dict[str, bool]) -> PackageToxEnv:
         name, core_type = name_type
@@ -502,24 +511,31 @@ class EnvSelector:
             return package_tox_env
 
     def _get_package_env(self, packager: str, name: str, is_active: bool) -> PackageToxEnv:  # noqa: FBT001
-        assert self._defined_envs_ is not None  # noqa: S101
-        if name in self._defined_envs_:
-            env = self._defined_envs_[name].env
-            if isinstance(env, PackageToxEnv):
-                if env.id() != packager:  # pragma: no branch # same env name is used by different packaging
-                    msg = f"{name} is already defined as a {env.id()}, cannot be {packager} too"  # pragma: no cover
-                    raise HandledError(msg)  # pragma: no cover
-                return env
-            self._state.conf.clear_env(name)
-        package_type = REGISTER.package(packager)
-        pkg_conf = self._state.conf.get_env(name, package=True)
-        journal = self._journal.get_env_journal(name)
-        args = ToxEnvCreateArgs(pkg_conf, self._state.conf.core, self._state.conf.options, journal, self._log_handler)
-        pkg_env: PackageToxEnv = package_type(args)
-        pkg_env.register_config()
-        self._defined_envs_[name] = _ToxEnvInfo(pkg_env, is_active)
-        self._manager.tox_add_env_config(pkg_conf, self._state)
-        return pkg_env
+        with profile_block("env_select.build_package_env", env=name, packager=packager):
+            assert self._defined_envs_ is not None  # noqa: S101
+            if name in self._defined_envs_:
+                env = self._defined_envs_[name].env
+                if isinstance(env, PackageToxEnv):
+                    if env.id() != packager:  # pragma: no branch # same env name is used by different packaging
+                        msg = f"{name} is already defined as a {env.id()}, cannot be {packager} too"  # pragma: no cover
+                        raise HandledError(msg)  # pragma: no cover
+                    return env
+                self._state.conf.clear_env(name)
+            package_type = REGISTER.package(packager)
+            pkg_conf = self._state.conf.get_env(name, package=True)
+            journal = self._journal.get_env_journal(name)
+            args = ToxEnvCreateArgs(
+                pkg_conf,
+                self._state.conf.core,
+                self._state.conf.options,
+                journal,
+                self._log_handler,
+            )
+            pkg_env: PackageToxEnv = package_type(args)
+            pkg_env.register_config()
+            self._defined_envs_[name] = _ToxEnvInfo(pkg_env, is_active)
+            self._manager.tox_add_env_config(pkg_conf, self._state)
+            return pkg_env
 
     def _parse_factors(self) -> tuple[set[str], ...]:
         # factors is a list of lists, from the combination of nargs="+" and action="append"

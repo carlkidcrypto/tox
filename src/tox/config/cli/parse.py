@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, NamedTuple
 
 from tox.config.source import Source, discover_source
 from tox.report import HandledError, ToxHandler, setup_report
+from tox.util.profile import profile_block
 
 from .parser import Parsed, ToxParser
 
@@ -28,20 +29,21 @@ class Options(NamedTuple):
 
 
 def get_options(*args: str) -> Options:
-    pos_args: tuple[str, ...] | None = None
-    try:  # remove positional arguments passed to parser if specified, they are pulled directly from sys.argv
-        pos_arg_at = args.index("--")
-    except ValueError:
-        pass
-    else:
-        pos_args = tuple(args[pos_arg_at + 1 :])
-        args = args[:pos_arg_at]
+    with profile_block("cli.get_options", argc=len(args)):
+        pos_args: tuple[str, ...] | None = None
+        try:  # remove positional arguments passed to parser if specified, they are pulled directly from sys.argv
+            pos_arg_at = args.index("--")
+        except ValueError:
+            pass
+        else:
+            pos_args = tuple(args[pos_arg_at + 1 :])
+            args = args[:pos_arg_at]
 
-    guess_verbosity, log_handler, source = _get_base(args)
-    parsed, cmd_handlers = _get_all(args)
-    if guess_verbosity != parsed.verbosity:
-        log_handler.update_verbosity(parsed.verbosity)
-    return Options(parsed, pos_args, source, cmd_handlers, log_handler)
+        guess_verbosity, log_handler, source = _get_base(args)
+        parsed, cmd_handlers = _get_all(args)
+        if guess_verbosity != parsed.verbosity:
+            log_handler.update_verbosity(parsed.verbosity)
+        return Options(parsed, pos_args, source, cmd_handlers, log_handler)
 
 
 def _get_base(args: Sequence[str]) -> tuple[int, ToxHandler, Source]:
@@ -49,11 +51,12 @@ def _get_base(args: Sequence[str]) -> tuple[int, ToxHandler, Source]:
     tox_parser = ToxParser.base()
     parsed = Parsed()
     try:
-        with (
-            Path(os.devnull).open("w", encoding=locale.getpreferredencoding(do_setlocale=False)) as file_handler,
-            redirect_stderr(file_handler),
-        ):
-            tox_parser.parse_known_args(args, namespace=parsed)
+        with profile_block("cli.parse_base", argc=len(args)):
+            with (
+                Path(os.devnull).open("w", encoding=locale.getpreferredencoding(do_setlocale=False)) as file_handler,
+                redirect_stderr(file_handler),
+            ):
+                tox_parser.parse_known_args(args, namespace=parsed)
     except SystemExit:
         ...  # ignore parse errors, such as -va raises ignored explicit argument 'a'
     guess_verbosity = parsed.verbosity
@@ -61,14 +64,16 @@ def _get_base(args: Sequence[str]) -> tuple[int, ToxHandler, Source]:
     from tox.plugin.manager import MANAGER  # load the plugin system right after we set up report  # noqa: PLC0415
 
     try:
-        source = discover_source(parsed.config_file, parsed.root_dir)
+        with profile_block("cli.discover_source"):
+            source = discover_source(parsed.config_file, parsed.root_dir)
     except HandledError:
         if {"-h", "--help"}.intersection(args):
             source = _empty_source()
         else:
             raise
 
-    MANAGER.load_plugins(source.path)
+    with profile_block("cli.load_plugins"):
+        MANAGER.load_plugins(source.path)
 
     return guess_verbosity, handler, source
 
@@ -81,14 +86,16 @@ def _empty_source() -> Source:
 
 def _get_all(args: Sequence[str]) -> tuple[Parsed, dict[str, Callable[[State], int]]]:
     """Parse all the options."""
-    tox_parser = _get_parser()
+    with profile_block("cli.build_parser"):
+        tox_parser = _get_parser()
     try:
         import argcomplete  # noqa: PLC0415
 
         argcomplete.autocomplete(tox_parser)
     except ImportError:
         pass
-    parsed, unknown = tox_parser.parse_known_args(args)
+    with profile_block("cli.parse_all", argc=len(args)):
+        parsed, unknown = tox_parser.parse_known_args(args)
     parsed.remainder = unknown
     if getattr(parsed, "no_capture", False) and getattr(parsed, "result_json", None):
         tox_parser.error("argument -i/--no-capture: not allowed with argument --result-json")

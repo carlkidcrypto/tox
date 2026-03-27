@@ -1,0 +1,7 @@
+mode,sample,elapsed_ms,cli_load_plugins_ms,run_main_wrapper_ms
+baseline,1,592,15.07,43.02
+fixed,1,253,8.65,27.45
+baseline,2,2104,4.72,22.51
+fixed,2,268,1.71,21.43
+baseline,3,219,4.58,22.66
+fixed,3,259,2.65,23.43

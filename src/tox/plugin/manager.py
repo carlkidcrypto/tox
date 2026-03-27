@@ -31,6 +31,9 @@ if TYPE_CHECKING:
     from tox.tox_env.api import ToxEnv
 
 
+_TRUE_VALUES = {"1", "true", "yes", "on"}
+
+
 class Plugin:
     def __init__(self) -> None:
         self.manager: pluggy.PluginManager = pluggy.PluginManager(NAME)
@@ -92,6 +95,8 @@ class Plugin:
     def _load_external_plugins(self) -> None:
         for name in os.environ.get("TOX_DISABLED_EXTERNAL_PLUGINS", "").split(","):
             self.manager.set_blocked(name)
+        if os.environ.get("TOX_SKIP_EXTERNAL_PLUGINS", "").strip().lower() in _TRUE_VALUES:
+            return
         self.manager.load_setuptools_entrypoints(NAME)
 
     def tox_extend_envs(self) -> list[Iterable[str]]:

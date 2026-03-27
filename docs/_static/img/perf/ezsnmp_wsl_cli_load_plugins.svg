@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="430" viewBox="0 0 900 430" role="img" aria-labelledby="title desc">
+  <title id="title">cli.load_plugins timing in WSL</title>
+  <desc id="desc">Bar chart comparing baseline versus fixed plugin loading milliseconds for three samples.</desc>
+  <style>
+    text { font-family: "DejaVu Sans", "Noto Sans", sans-serif; fill: #17202a; }
+    .axis { stroke: #5d6d7e; stroke-width: 1; }
+    .grid { stroke: #d5d8dc; stroke-width: 1; }
+    .baseline { fill: #2e86c1; }
+    .fixed { fill: #27ae60; }
+    .label { font-size: 13px; }
+    .title { font-size: 20px; font-weight: 700; }
+    .subtitle { font-size: 13px; fill: #566573; }
+    .value { font-size: 12px; font-weight: 600; }
+  </style>
+
+  <rect x="0" y="0" width="900" height="430" fill="#f8f9f9"/>
+
+  <text class="title" x="30" y="35">WSL ezsnmp tox -av cli.load_plugins</text>
+  <text class="subtitle" x="30" y="58">This isolates startup time spent in plugin discovery.</text>
+
+  <line class="axis" x1="90" y1="90" x2="90" y2="360"/>
+  <line class="axis" x1="90" y1="360" x2="860" y2="360"/>
+
+  <line class="grid" x1="90" y1="315" x2="860" y2="315"/>
+  <line class="grid" x1="90" y1="270" x2="860" y2="270"/>
+  <line class="grid" x1="90" y1="225" x2="860" y2="225"/>
+  <line class="grid" x1="90" y1="180" x2="860" y2="180"/>
+  <line class="grid" x1="90" y1="135" x2="860" y2="135"/>
+
+  <text class="label" x="36" y="363">0</text>
+  <text class="label" x="32" y="318">3</text>
+  <text class="label" x="32" y="273">6</text>
+  <text class="label" x="32" y="228">9</text>
+  <text class="label" x="24" y="183">12</text>
+  <text class="label" x="24" y="138">15</text>
+
+  <rect class="baseline" x="160" y="89.01" width="65" height="270.99"/>
+  <rect class="fixed" x="235" y="204.30" width="65" height="155.70"/>
+  <text class="value" x="164" y="82">15.07</text>
+  <text class="value" x="242" y="197">8.65</text>
+
+  <rect class="baseline" x="390" y="275.04" width="65" height="84.96"/>
+  <rect class="fixed" x="465" y="329.22" width="65" height="30.78"/>
+  <text class="value" x="400" y="268">4.72</text>
+  <text class="value" x="476" y="322">1.71</text>
+
+  <rect class="baseline" x="620" y="277.56" width="65" height="82.44"/>
+  <rect class="fixed" x="695" y="312.30" width="65" height="47.70"/>
+  <text class="value" x="630" y="271">4.58</text>
+  <text class="value" x="706" y="305">2.65</text>
+
+  <text class="label" x="195" y="385">Sample 1</text>
+  <text class="label" x="425" y="385">Sample 2</text>
+  <text class="label" x="655" y="385">Sample 3</text>
+
+  <rect class="baseline" x="650" y="24" width="20" height="12"/>
+  <text class="label" x="678" y="34">baseline</text>
+  <rect class="fixed" x="760" y="24" width="20" height="12"/>
+  <text class="label" x="788" y="34">fixed</text>
+</svg>
