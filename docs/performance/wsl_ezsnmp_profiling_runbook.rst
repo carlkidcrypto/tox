@@ -71,6 +71,7 @@ Notes for better signal quality:
 - Keep the same shell and venv for all samples.
 - Avoid heavy host activity during sampling.
 - Use median across samples, not just a single run.
+- For highest-resolution filtering, use ``TOX_PROFILE_MIN_NS`` (takes precedence over ``TOX_PROFILE_MIN_US`` and ``TOX_PROFILE_MIN_MS``).
 
 Collected Data
 --------------

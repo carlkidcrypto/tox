@@ -21,12 +21,11 @@ def profile_enabled() -> bool:
 def profile_log(name: str, duration: float, **fields: Any) -> None:
     if not profile_enabled():
         return
-    min_ms = _profile_min_ms()
-    duration_ms = duration * 1000
-    if duration_ms < min_ms:
+    duration_ns = max(0, round(duration * 1_000_000_000))
+    if duration_ns < _profile_min_ns():
         return
     suffix = "".join(f" {key}={value!r}" for key, value in fields.items())
-    LOGGER.warning("[profile] %s took %.2f ms%s", name, duration_ms, suffix)
+    LOGGER.warning("[profile] %s took %d ns%s", name, duration_ns, suffix)
 
 
 @contextmanager
@@ -34,21 +33,36 @@ def profile_block(name: str, **fields: Any) -> Iterator[None]:
     if not profile_enabled():
         yield
         return
-    start = time.monotonic()
+    start = time.perf_counter_ns()
     try:
         yield
     finally:
-        profile_log(name, time.monotonic() - start, **fields)
+        duration_s = (time.perf_counter_ns() - start) / 1_000_000_000
+        profile_log(name, duration_s, **fields)
 
 
-def _profile_min_ms() -> float:
+def _profile_min_ns() -> int:
+    raw_ns = os.environ.get("TOX_PROFILE_MIN_NS", "").strip()
+    if raw_ns:
+        try:
+            return max(0, round(float(raw_ns)))
+        except ValueError:
+            return 0
+
+    raw_us = os.environ.get("TOX_PROFILE_MIN_US", "").strip()
+    if raw_us:
+        try:
+            return max(0, round(float(raw_us) * 1_000))
+        except ValueError:
+            return 0
+
     raw = os.environ.get("TOX_PROFILE_MIN_MS", "0").strip()
     if not raw:
-        return 0.0
+        return 0
     try:
-        return max(0.0, float(raw))
+        return max(0, round(float(raw) * 1_000_000))
     except ValueError:
-        return 0.0
+        return 0
 
 
 __all__ = [

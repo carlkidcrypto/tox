@@ -27,6 +27,7 @@ def test_profile_log(monkeypatch: MonkeyPatch, caplog: LogCaptureFixture) -> Non
     assert len(caplog.records) == 1
     message = caplog.records[0].getMessage()
     assert "[profile] demo took" in message
+    assert " ns" in message
     assert "env='py'" in message
 
 
@@ -38,6 +39,42 @@ def test_profile_log_respects_threshold(monkeypatch: MonkeyPatch, caplog: LogCap
     profile_log("short", 0.005)
 
     assert not caplog.records
+
+
+def test_profile_log_microsecond_resolution(monkeypatch: MonkeyPatch, caplog: LogCaptureFixture) -> None:
+    monkeypatch.setenv("TOX_PROFILE", "1")
+    caplog.set_level(logging.WARNING)
+
+    profile_log("tiny", 0.000345)
+
+    assert len(caplog.records) == 1
+    message = caplog.records[0].getMessage()
+    assert "[profile] tiny took" in message
+    assert " ns" in message
+
+
+def test_profile_log_respects_microsecond_threshold(monkeypatch: MonkeyPatch, caplog: LogCaptureFixture) -> None:
+    monkeypatch.setenv("TOX_PROFILE", "1")
+    monkeypatch.setenv("TOX_PROFILE_MIN_US", "500")
+    caplog.set_level(logging.WARNING)
+
+    profile_log("short_us", 0.0004)
+    profile_log("long_us", 0.0008)
+
+    assert len(caplog.records) == 1
+    assert "long_us" in caplog.records[0].getMessage()
+
+
+def test_profile_log_respects_nanosecond_threshold(monkeypatch: MonkeyPatch, caplog: LogCaptureFixture) -> None:
+    monkeypatch.setenv("TOX_PROFILE", "1")
+    monkeypatch.setenv("TOX_PROFILE_MIN_NS", "800")
+    caplog.set_level(logging.WARNING)
+
+    profile_log("short_ns", 0.0000004)
+    profile_log("long_ns", 0.0000012)
+
+    assert len(caplog.records) == 1
+    assert "long_ns" in caplog.records[0].getMessage()
 
 
 def test_profile_block(monkeypatch: MonkeyPatch, caplog: LogCaptureFixture) -> None:
