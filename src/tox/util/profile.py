@@ -42,25 +42,11 @@ def profile_block(name: str, **fields: Any) -> Iterator[None]:
 
 
 def _profile_min_ns() -> int:
-    raw_ns = os.environ.get("TOX_PROFILE_MIN_NS", "").strip()
-    if raw_ns:
-        try:
-            return max(0, round(float(raw_ns)))
-        except ValueError:
-            return 0
-
-    raw_us = os.environ.get("TOX_PROFILE_MIN_US", "").strip()
-    if raw_us:
-        try:
-            return max(0, round(float(raw_us) * 1_000))
-        except ValueError:
-            return 0
-
-    raw = os.environ.get("TOX_PROFILE_MIN_MS", "0").strip()
-    if not raw:
+    raw_ns = os.environ.get("TOX_PROFILE_NS", "").strip()
+    if not raw_ns:
         return 0
     try:
-        return max(0, round(float(raw) * 1_000_000))
+        return max(0, round(float(raw_ns)))
     except ValueError:
         return 0
 

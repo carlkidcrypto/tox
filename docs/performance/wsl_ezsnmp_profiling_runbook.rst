@@ -53,14 +53,14 @@ Measurement Procedure
 3. Run baseline sample::
 
     start=$(date +%s%3N)
-    TOX_PROFILE=1 TOX_PROFILE_MIN_MS=1 python3 -m tox -av 2>&1 | tee /tmp/ezsnmp_tox_profile_baseline.log
+    TOX_PROFILE=1 TOX_PROFILE_NS=1000000 python3 -m tox -av 2>&1 | tee /tmp/ezsnmp_tox_profile_baseline.log
     end=$(date +%s%3N)
     echo "elapsed_ms=$((end-start))" | tee -a /tmp/ezsnmp_tox_profile_baseline.log
 
 4. Run fixed sample::
 
     start=$(date +%s%3N)
-    TOX_PROFILE=1 TOX_PROFILE_MIN_MS=1 TOX_SKIP_EXTERNAL_PLUGINS=1 python3 -m tox -av 2>&1 | tee /tmp/ezsnmp_tox_profile_fixed.log
+    TOX_PROFILE=1 TOX_PROFILE_NS=1000000 TOX_SKIP_EXTERNAL_PLUGINS=1 python3 -m tox -av 2>&1 | tee /tmp/ezsnmp_tox_profile_fixed.log
     end=$(date +%s%3N)
     echo "elapsed_ms=$((end-start))" | tee -a /tmp/ezsnmp_tox_profile_fixed.log
 
@@ -71,7 +71,7 @@ Notes for better signal quality:
 - Keep the same shell and venv for all samples.
 - Avoid heavy host activity during sampling.
 - Use median across samples, not just a single run.
-- For highest-resolution filtering, use ``TOX_PROFILE_MIN_NS`` (takes precedence over ``TOX_PROFILE_MIN_US`` and ``TOX_PROFILE_MIN_MS``).
+- Use ``TOX_PROFILE_NS`` to filter logs by minimum duration in nanoseconds.
 
 Collected Data
 --------------
